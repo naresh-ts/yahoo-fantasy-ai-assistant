@@ -9,6 +9,7 @@ from __future__ import annotations
 import base64
 import getpass
 import json
+import os
 from collections.abc import Mapping, Sequence
 from typing import Any
 from urllib.error import HTTPError, URLError
@@ -77,8 +78,16 @@ def main() -> int:
     print("Yahoo Fantasy API access test")
     print("Credentials and tokens are kept in memory and are not saved.\n")
 
-    client_id = getpass.getpass("Paste the Yahoo Client ID (input hidden): ").strip()
-    client_secret = getpass.getpass("Paste the Yahoo Client Secret (input hidden): ").strip()
+    client_id = os.environ.get("YAHOO_CLIENT_ID", "").strip()
+    client_secret = os.environ.get("YAHOO_CLIENT_SECRET", "").strip()
+
+    if client_id and client_secret:
+        print("Using Yahoo credentials from secure environment variables.")
+    else:
+        client_id = getpass.getpass("Paste the Yahoo Client ID (input hidden): ").strip()
+        client_secret = getpass.getpass(
+            "Paste the Yahoo Client Secret (input hidden): "
+        ).strip()
     if not client_id or not client_secret:
         print("Client ID and Client Secret are required.")
         return 1
