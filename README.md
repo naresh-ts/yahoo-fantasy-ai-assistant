@@ -77,6 +77,19 @@ mcp run server.py --transport streamable-http
 
 The local MCP endpoint will be available at `http://localhost:8000/mcp`.
 
+## Test Approved Yahoo Access
+
+After Yahoo approves and provisions the Developer application, run the private,
+interactive access test from a local terminal or GitHub Codespace:
+
+```bash
+python oauth_access_test.py
+```
+
+The script requests the Client ID and Client Secret using hidden terminal input,
+opens the Yahoo authorization flow, and checks whether league `560937` is visible.
+Credentials and OAuth tokens remain in memory and are not saved to disk.
+
 ## Configuration
 
 After Yahoo approves the application, copy `.env.example` to `.env` and enter the
