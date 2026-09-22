@@ -86,9 +86,11 @@ interactive access test from a local terminal or GitHub Codespace:
 python oauth_access_test.py
 ```
 
-The script requests the Client ID and Client Secret using hidden terminal input,
-opens the Yahoo authorization flow, and checks whether league `560937` is visible.
-Credentials and OAuth tokens remain in memory and are not saved to disk.
+When `YAHOO_CLIENT_ID` and `YAHOO_CLIENT_SECRET` are configured as GitHub
+Codespaces secrets, the script reads them automatically. Otherwise, it requests
+them using hidden terminal input. It then opens the Yahoo authorization flow and
+checks whether league `560937` is visible. Credentials and OAuth tokens remain in
+memory and are not saved to disk.
 
 ## Configuration
 
