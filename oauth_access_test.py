@@ -10,6 +10,7 @@ import base64
 import getpass
 import json
 import os
+import webbrowser
 from collections.abc import Mapping, Sequence
 from typing import Any
 from urllib.error import HTTPError, URLError
@@ -100,8 +101,11 @@ def main() -> int:
             "language": "en-us",
         }
     )
-    print("\nOpen this private authorization link in your browser:")
-    print(f"{AUTHORIZATION_URL}?{authorization_query}")
+    authorization_url = f"{AUTHORIZATION_URL}?{authorization_query}"
+    print("\nOpening the private Yahoo authorization page in your browser.")
+    if not webbrowser.open(authorization_url):
+        print("If it did not open automatically, use this private authorization link:")
+        print(authorization_url)
     print("\nApprove access. The localhost page may fail to load; that is expected.")
     callback_value = getpass.getpass(
         "Paste the full redirected URL or only its code value (input hidden): "
