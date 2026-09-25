@@ -1,7 +1,7 @@
 """Interactively verify Yahoo OAuth and Fantasy Sports API access.
 
-This script keeps credentials and OAuth tokens in memory only. It is intended to
-be run from a private local terminal or GitHub Codespace.
+Credentials and OAuth tokens remain in memory. In GitHub Codespaces, Yahoo's
+one-time callback is received automatically through a private forwarded port.
 """
 
 from __future__ import annotations
@@ -10,8 +10,13 @@ import base64
 import getpass
 import json
 import os
+import secrets
+import time
 import webbrowser
+from concurrent.futures import ThreadPoolExecutor
 from collections.abc import Mapping, Sequence
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+from queue import Empty, Queue
 from typing import Any
 from urllib.error import HTTPError, URLError
 from urllib.parse import parse_qs, urlencode, urlparse
@@ -23,7 +28,9 @@ FANTASY_API_URL = (
     "https://fantasysports.yahooapis.com/fantasy/v2/"
     "users;use_login=1/games;game_codes=nfl/leagues?format=json"
 )
-REDIRECT_URI = "https://localhost:8080"
+LOCAL_REDIRECT_URI = "https://localhost:8080"
+CALLBACK_PORT = 8080
+CALLBACK_TIMEOUT_SECONDS = 180
 TARGET_LEAGUE_ID = "560937"
 
 
@@ -38,6 +45,16 @@ def extract_authorization_code(value: str) -> str:
 
     parameters = parse_qs(urlparse(cleaned).query)
     return parameters.get("code", [""])[0]
+
+
+def codespace_redirect_uri() -> str:
+    """Return the private HTTPS forwarding URL for port 8080, if available."""
+
+    name = os.environ.get("CODESPACE_NAME", "").strip()
+    domain = os.environ.get("GITHUB_CODESPACES_PORT_FORWARDING_DOMAIN", "").strip()
+    if name and domain:
+        return f"https://{name}-{CALLBACK_PORT}.{domain}"
+    return ""
 
 
 def contains_league_id(value: Any, league_id: str) -> bool:
@@ -73,6 +90,59 @@ def request_json(request: Request) -> dict[str, Any]:
     return payload
 
 
+def receive_codespace_callback(expected_state: str) -> str:
+    """Receive one valid Yahoo callback through the Codespaces HTTPS proxy."""
+
+    results: Queue[str] = Queue(maxsize=1)
+
+    class CallbackHandler(BaseHTTPRequestHandler):
+        def do_GET(self) -> None:  # noqa: N802
+            parameters = parse_qs(urlparse(self.path).query)
+            state = parameters.get("state", [""])[0]
+            code = parameters.get("code", [""])[0]
+            error = parameters.get("error", [""])[0]
+
+            if state != expected_state:
+                self.send_response(400)
+                body = b"Invalid OAuth state. You may close this page."
+            elif error:
+                self.send_response(400)
+                body = b"Yahoo authorization was not approved. You may close this page."
+                if results.empty():
+                    results.put("")
+            elif code:
+                self.send_response(200)
+                body = b"Yahoo authorization received. You may return to ChatGPT."
+                if results.empty():
+                    results.put(code)
+            else:
+                self.send_response(404)
+                body = b"Waiting for Yahoo authorization."
+
+            self.send_header("Content-Type", "text/plain; charset=utf-8")
+            self.send_header("Content-Length", str(len(body)))
+            self.end_headers()
+            self.wfile.write(body)
+
+        def log_message(self, format: str, *args: object) -> None:
+            return
+
+    server = ThreadingHTTPServer(("0.0.0.0", CALLBACK_PORT), CallbackHandler)
+    server.timeout = 1
+    deadline = time.monotonic() + CALLBACK_TIMEOUT_SECONDS
+    try:
+        while time.monotonic() < deadline:
+            server.handle_request()
+            try:
+                return results.get_nowait()
+            except Empty:
+                continue
+    finally:
+        server.server_close()
+
+    return ""
+
+
 def main() -> int:
     """Authorize the account and verify access to the user's fantasy league."""
 
@@ -93,33 +163,50 @@ def main() -> int:
         print("Client ID and Client Secret are required.")
         return 1
 
+    redirect_uri = codespace_redirect_uri() or LOCAL_REDIRECT_URI
+    state = secrets.token_urlsafe(32)
     authorization_query = urlencode(
         {
             "client_id": client_id,
-            "redirect_uri": REDIRECT_URI,
+            "redirect_uri": redirect_uri,
             "response_type": "code",
             "language": "en-us",
+            "state": state,
         }
     )
     authorization_url = f"{AUTHORIZATION_URL}?{authorization_query}"
+
     print("\nOpening the private Yahoo authorization page in your browser.")
-    if not webbrowser.open(authorization_url):
-        print("If it did not open automatically, use this private authorization link:")
-        print(authorization_url)
-    print("\nApprove access. The localhost page may fail to load; that is expected.")
-    callback_value = getpass.getpass(
-        "Paste the full redirected URL or only its code value (input hidden): "
-    )
-    authorization_code = extract_authorization_code(callback_value)
+    if codespace_redirect_uri():
+        with ThreadPoolExecutor(max_workers=1) as executor:
+            callback_future = executor.submit(receive_codespace_callback, state)
+            time.sleep(0.25)
+            if not webbrowser.open(authorization_url):
+                print("The Yahoo authorization page could not be opened automatically.")
+                return 1
+            print("Waiting for Yahoo's secure callback; no copying or pasting is needed.")
+            authorization_code = callback_future.result()
+    else:
+        if not webbrowser.open(authorization_url):
+            print("The Yahoo authorization page could not be opened automatically.")
+            return 1
+        print("\nApprove access. The localhost page may fail to load; that is expected.")
+        callback_value = getpass.getpass(
+            "Paste the full redirected URL or only its code value (input hidden): "
+        )
+        authorization_code = extract_authorization_code(callback_value)
+
     if not authorization_code:
-        print("No authorization code was found.")
+        print("No valid authorization code was received.")
         return 1
 
-    basic_credentials = base64.b64encode(f"{client_id}:{client_secret}".encode()).decode("ascii")
+    basic_credentials = base64.b64encode(
+        f"{client_id}:{client_secret}".encode()
+    ).decode("ascii")
     token_body = urlencode(
         {
             "grant_type": "authorization_code",
-            "redirect_uri": REDIRECT_URI,
+            "redirect_uri": redirect_uri,
             "code": authorization_code,
         }
     ).encode("ascii")
@@ -149,7 +236,10 @@ def main() -> int:
         return 1
 
     if contains_league_id(fantasy_payload, TARGET_LEAGUE_ID):
-        print(f"\nSuccess: Fantasy API access is active and league {TARGET_LEAGUE_ID} is visible.")
+        print(
+            f"\nSuccess: Fantasy API access is active and league "
+            f"{TARGET_LEAGUE_ID} is visible."
+        )
     else:
         print(
             "\nSuccess: Fantasy API access is active, but league "
