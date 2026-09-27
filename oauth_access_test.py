@@ -1,26 +1,27 @@
-"""Interactively verify Yahoo OAuth and Fantasy Sports API access.
-
-Credentials and OAuth tokens remain in memory. In GitHub Codespaces, Yahoo's
-one-time callback is received automatically through a private forwarded port.
-"""
+"""Authorize Yahoo, verify league access, and optionally save secure Codespaces secrets."""
 
 from __future__ import annotations
 
+import asyncio
 import base64
 import getpass
 import json
 import os
 import secrets
+import subprocess
 import time
 import webbrowser
-from concurrent.futures import ThreadPoolExecutor
 from collections.abc import Mapping, Sequence
+from concurrent.futures import ThreadPoolExecutor
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from queue import Empty, Queue
 from typing import Any
 from urllib.error import HTTPError, URLError
 from urllib.parse import parse_qs, urlencode, urlparse
 from urllib.request import Request, urlopen
+
+from config import Settings
+from yahoo_client import YahooFantasyClient
 
 AUTHORIZATION_URL = "https://api.login.yahoo.com/oauth2/request_auth"
 TOKEN_URL = "https://api.login.yahoo.com/oauth2/get_token"
@@ -32,6 +33,9 @@ LOCAL_REDIRECT_URI = "https://localhost:8080"
 CALLBACK_PORT = 8080
 CALLBACK_TIMEOUT_SECONDS = 180
 TARGET_LEAGUE_ID = "560937"
+TARGET_TEAM_NAME = "Redzone naresh"
+GITHUB_REPOSITORY = "naresh-ts/yahoo-fantasy-ai-assistant"
+SAVE_SECRETS_ENV = "YAHOO_SAVE_CODESPACES_SECRETS"
 
 
 def extract_authorization_code(value: str) -> str:
@@ -96,7 +100,7 @@ def receive_codespace_callback(expected_state: str) -> str:
     results: Queue[str] = Queue(maxsize=1)
 
     class CallbackHandler(BaseHTTPRequestHandler):
-        def do_GET(self) -> None:  # noqa: N802
+        def do_GET(self) -> None:
             parameters = parse_qs(urlparse(self.path).query)
             state = parameters.get("state", [""])[0]
             code = parameters.get("code", [""])[0]
@@ -143,11 +147,70 @@ def receive_codespace_callback(expected_state: str) -> str:
     return ""
 
 
+def set_codespaces_secret(name: str, value: str) -> None:
+    """Store a value as a user Codespaces secret scoped to this repository."""
+
+    subprocess.run(
+        [
+            "gh",
+            "secret",
+            "set",
+            name,
+            "--user",
+            "--app",
+            "codespaces",
+            "--repos",
+            GITHUB_REPOSITORY,
+        ],
+        input=value,
+        text=True,
+        check=True,
+        stdout=subprocess.DEVNULL,
+    )
+
+
+def save_codespaces_configuration(refresh_token: str) -> None:
+    """Persist renewable access and non-secret league selection privately."""
+
+    set_codespaces_secret("YAHOO_REFRESH_TOKEN", refresh_token)
+    set_codespaces_secret("YAHOO_LEAGUE_ID", TARGET_LEAGUE_ID)
+    set_codespaces_secret("YAHOO_TEAM_NAME", TARGET_TEAM_NAME)
+
+
+async def retrieve_snapshot(access_token: str) -> dict[str, Any]:
+    """Retrieve a small live roster/free-agent snapshot for verification."""
+
+    settings = Settings(_env_file=None)
+    async with YahooFantasyClient(settings, access_token) as client:
+        return await client.get_team_snapshot(
+            TARGET_LEAGUE_ID,
+            TARGET_TEAM_NAME,
+            free_agent_count=5,
+        )
+
+
+def print_snapshot_summary(snapshot: Mapping[str, Any]) -> None:
+    """Print only the normalized fields needed to verify live retrieval."""
+
+    team = snapshot["team"]
+    roster = snapshot["roster"]
+    available = snapshot["available_players"]
+    print(f"Team verified: {team['name']} ({team['team_key']})")
+    print(f"Roster retrieved: {len(roster)} players")
+    for player in roster:
+        position = player["selected_position"] or player["positions"]
+        print(f"  {position}: {player['name']} ({player['nfl_team']})")
+    print("Available-player samples retrieved:")
+    for position, players in available.items():
+        names = ", ".join(player["name"] for player in players)
+        print(f"  {position}: {len(players)} players - {names}")
+
+
 def main() -> int:
-    """Authorize the account and verify access to the user's fantasy league."""
+    """Authorize the account, verify live reads, and optionally save secrets."""
 
     print("Yahoo Fantasy API access test")
-    print("Credentials and tokens are kept in memory and are not saved.\n")
+    print("Credentials and OAuth tokens are never printed or written to the repository.\n")
 
     client_id = os.environ.get("YAHOO_CLIENT_ID", "").strip()
     client_secret = os.environ.get("YAHOO_CLIENT_SECRET", "").strip()
@@ -223,6 +286,7 @@ def main() -> int:
     try:
         token_payload = request_json(token_request)
         access_token = str(token_payload.get("access_token", ""))
+        refresh_token = str(token_payload.get("refresh_token", ""))
         if not access_token:
             raise RuntimeError("Yahoo did not return an access token.")
 
@@ -235,16 +299,34 @@ def main() -> int:
         print(f"\nAccess test failed: {exc}")
         return 1
 
-    if contains_league_id(fantasy_payload, TARGET_LEAGUE_ID):
+    if not contains_league_id(fantasy_payload, TARGET_LEAGUE_ID):
         print(
-            f"\nSuccess: Fantasy API access is active and league "
-            f"{TARGET_LEAGUE_ID} is visible."
-        )
-    else:
-        print(
-            "\nSuccess: Fantasy API access is active, but league "
+            "\nFantasy API access is active, but league "
             f"{TARGET_LEAGUE_ID} was not found for the authorized Yahoo account."
         )
+        return 1
+
+    print(f"\nSuccess: league {TARGET_LEAGUE_ID} is visible.")
+    try:
+        snapshot = asyncio.run(retrieve_snapshot(access_token))
+        print_snapshot_summary(snapshot)
+    except Exception as exc:  # noqa: BLE001
+        print(f"Live roster/free-agent verification failed: {type(exc).__name__}: {exc}")
+        return 1
+
+    if os.environ.get(SAVE_SECRETS_ENV) == "1":
+        if not refresh_token:
+            print("Yahoo did not return a refresh token; secure storage was skipped.")
+            return 1
+        try:
+            save_codespaces_configuration(refresh_token)
+        except (OSError, subprocess.CalledProcessError) as exc:
+            print(f"Could not save the private Codespaces secrets: {type(exc).__name__}")
+            return 1
+        print("Private Codespaces secrets saved successfully.")
+    else:
+        print("Refresh token kept in memory only; secure storage was not requested.")
+
     return 0
 
 
