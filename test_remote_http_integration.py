@@ -1,7 +1,8 @@
 """Exercise the real MCP transport behind the OAuth gate via ASGI requests."""
 
+import asyncio
+
 import httpx
-import pytest
 from mcp.server import MCPServer
 
 from remote_transport import build_remote_mcp_app
@@ -22,8 +23,11 @@ def settings():
     }
 
 
-@pytest.mark.asyncio
-async def test_real_transport_rejects_missing_or_invalid_authorization():
+def test_real_transport_rejects_missing_or_invalid_authorization():
+    asyncio.run(_check_unauthorized_requests())
+
+
+async def _check_unauthorized_requests():
     app = build_remote_mcp_app(MCPServer("auth integration"), settings())
     transport = httpx.ASGITransport(app=app)
     async with httpx.AsyncClient(
