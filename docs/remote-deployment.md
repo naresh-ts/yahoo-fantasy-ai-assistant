@@ -120,3 +120,16 @@ Before deployment: verify the installed MCP library's transport API,
 add a reviewed remote launcher, test unauthorized and authorized real
 MCP HTTP requests, implement OAuth protected-resource discovery and
 ChatGPT-compatible sign-in, and provision a secure $0 host.
+
+## Real MCP transport composition
+
+`remote_transport.build_remote_mcp_app(mcp, env)` creates the MCP SDK's
+actual `streamable_http_app()` and wraps it in the OAuth ASGI gate.
+It also enforces an explicit public HTTPS hostname and a configured
+browser Origin allowlist. The returned ASGI app owns its normal MCP
+lifespan. Do not mount it under another ASGI app without carrying over
+the MCP session-manager lifespan.
+
+**Still not deployable:** No public launcher, OAuth discovery metadata,
+identity-provider integration, free-host provisioning, or full remote
+MCP client handshake test exists yet. Never serve the bare MCP app.
