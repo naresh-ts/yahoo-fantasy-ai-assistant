@@ -9,13 +9,7 @@ import token_store
 
 def test_save_and_load_refresh_token(tmp_path, monkeypatch):
     token_file = tmp_path / "private" / "refresh_token"
-
-    monkeypatch.setattr(
-        token_store, "TOKEN_DIRECTORY", token_file.parent
-    )
-    monkeypatch.setattr(
-        token_store, "TOKEN_FILE", token_file
-    )
+    monkeypatch.setenv("YAHOO_TOKEN_DIR", str(token_file.parent))
 
     token_store.save_refresh_token("example-token")
 
@@ -26,13 +20,7 @@ def test_save_and_load_refresh_token(tmp_path, monkeypatch):
 
 def test_replacement_token(tmp_path, monkeypatch):
     token_file = tmp_path / "private" / "refresh_token"
-
-    monkeypatch.setattr(
-        token_store, "TOKEN_DIRECTORY", token_file.parent
-    )
-    monkeypatch.setattr(
-        token_store, "TOKEN_FILE", token_file
-    )
+    monkeypatch.setenv("YAHOO_TOKEN_DIR", str(token_file.parent))
 
     token_store.save_refresh_token("original-token")
     token_store.save_refresh_token("replacement-token")
@@ -42,11 +30,20 @@ def test_replacement_token(tmp_path, monkeypatch):
 
 def test_reject_insecure_permissions(tmp_path, monkeypatch):
     token_file = tmp_path / "refresh_token"
-
-    monkeypatch.setattr(token_store, "TOKEN_FILE", token_file)
-
+    monkeypatch.setenv("YAHOO_TOKEN_DIR", str(tmp_path))
     token_file.write_text("example-token")
     os.chmod(token_file, 0o644)
 
     with pytest.raises(PermissionError):
+        token_store.load_refresh_token()
+
+
+def test_reject_symlinked_token_file(tmp_path, monkeypatch):
+    token_file = tmp_path / "refresh_token"
+    target = tmp_path / "other"
+    target.write_text("example-token")
+    token_file.symlink_to(target)
+    monkeypatch.setenv("YAHOO_TOKEN_DIR", str(tmp_path))
+
+    with pytest.raises(PermissionError, match="symlinked"):
         token_store.load_refresh_token()
