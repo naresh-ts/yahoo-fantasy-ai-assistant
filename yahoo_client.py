@@ -183,6 +183,21 @@ class YahooFantasyClient:
                 return team
         raise LookupError(f"Yahoo team {team_name or 'owned by the current user'} was not found")
 
+    async def get_league_settings(self, league_key: str) -> dict[str, Any]:
+        """Return raw Yahoo league settings, including scoring and roster rules."""
+        return await self.get(f"league/{league_key}/settings")
+
+    async def get_league_scoreboard(
+        self, league_key: str, week: int | None = None
+    ) -> dict[str, Any]:
+        """Return raw Yahoo scoreboard data for matchup analysis."""
+        resource = f"league/{league_key}/scoreboard"
+        if week is not None:
+            if week < 1 or week > 25:
+                raise ValueError("Week must be between 1 and 25")
+            resource += f";week={week}"
+        return await self.get(resource)
+
     async def get_roster(self, team_key: str, week: int | None = None) -> list[dict[str, Any]]:
         resource = f"team/{team_key}/roster"
         if week is not None:
