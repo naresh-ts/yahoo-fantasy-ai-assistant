@@ -133,3 +133,13 @@ the MCP session-manager lifespan.
 **Still not deployable:** No public launcher, OAuth discovery metadata,
 identity-provider integration, free-host provisioning, or full remote
 MCP client handshake test exists yet. Never serve the bare MCP app.
+
+## Opt-in reverse-proxy launcher
+
+`python start_remote_server.py` now exists, but **do not deploy it yet**.
+It binds only to loopback, requires `MCP_TRUSTED_HTTPS_PROXY=true`,
+and applies all existing remote OAuth and persistent-token checks.
+The TLS reverse proxy, OAuth authorization-server setup, firewall,
+rate limits, Yahoo credentials and full authorized handshake remain
+deployment prerequisites. This launcher is not a public HTTPS endpoint
+and no cloud resources have been provisioned.
