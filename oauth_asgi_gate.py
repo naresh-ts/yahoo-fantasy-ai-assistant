@@ -32,9 +32,12 @@ class OAuthASGIGate:
             await self.app(scope, receive, send)
             return
 
-        if scope["type"] != "http":
-            await self._reject(send, 403)
+        if scope["type"] == "websocket":
+            await send({"type": "websocket.close", "code": 1008})
             return
+
+        if scope["type"] != "http":
+            raise ValueError("Unsupported ASGI scope type")
 
         headers = [
             value.decode("latin1")
@@ -50,8 +53,12 @@ class OAuthASGIGate:
             await self._reject(send, 401)
             return
 
+        if token != token.strip() or len(token) > 16384:
+            await self._reject(send, 401)
+            return
+
         try:
-            claims = self.verifier.verify(token.strip())
+            claims = self.verifier.verify(token)
         except (PyJWTError, ValueError, OSError):
             await self._reject(send, 401)
             return
