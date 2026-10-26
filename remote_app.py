@@ -29,4 +29,5 @@ def build_protected_app(
         audience=env["MCP_OAUTH_AUDIENCE"],
         jwks_url=jwks_url,
     )
-    return OAuthASGIGate(mcp_asgi_app, verifier, subject)
+    metadata_url = env["MCP_PUBLIC_URL"].removesuffix("/mcp") + "/.well-known/oauth-protected-resource/mcp"
+    return OAuthASGIGate(mcp_asgi_app, verifier, subject, metadata_url)

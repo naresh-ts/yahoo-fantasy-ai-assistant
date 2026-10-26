@@ -20,12 +20,14 @@ class OAuthASGIGate:
         app: Callable[..., Awaitable[Any]],
         verifier: OAuthVerifier,
         allowed_subject: str,
+        resource_metadata_url: str | None = None,
     ) -> None:
         if not allowed_subject:
             raise ValueError("An explicit allowed OAuth subject is required")
         self.app = app
         self.verifier = verifier
         self.allowed_subject = allowed_subject
+        self.resource_metadata_url = resource_metadata_url
 
     async def __call__(self, scope: dict, receive: Callable, send: Callable) -> None:
         if scope["type"] == "lifespan":
@@ -45,7 +47,7 @@ class OAuthASGIGate:
             if key.lower() == b"authorization"
         ]
         if len(headers) != 1:
-            await self._reject(send, 401)
+            await self._reject(send, 401, self.resource_metadata_url)
             return
 
         scheme, separator, token = headers[0].partition(" ")
@@ -64,22 +66,27 @@ class OAuthASGIGate:
             return
 
         if claims.get("sub") != self.allowed_subject:
-            await self._reject(send, 403)
+            await self._reject(send, 403, self.resource_metadata_url)
             return
 
         await self.app(scope, receive, send)
 
     @staticmethod
-    async def _reject(send: Callable, status: int) -> None:
+    async def _reject(send: Callable, status: int, metadata_url: str | None = None) -> None:
         body = json.dumps({"error": "unauthorized" if status == 401 else "forbidden"}).encode()
+        headers = [
+            (b"content-type", b"application/json"),
+            (b"cache-control", b"no-store"),
+        ]
+        if status == 401 and metadata_url:
+            headers.append(
+                (b"www-authenticate", f'Bearer resource_metadata="{metadata_url}"'.encode("ascii"))
+            )
         await send(
             {
                 "type": "http.response.start",
                 "status": status,
-                "headers": [
-                    (b"content-type", b"application/json"),
-                    (b"cache-control", b"no-store"),
-                ],
+                "headers": headers,
             }
         )
         await send({"type": "http.response.body", "body": body})

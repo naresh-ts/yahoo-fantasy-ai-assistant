@@ -37,6 +37,10 @@ async def _check():
             "bearer_methods_supported": ["header"],
         }
         assert metadata.headers["cache-control"] == "no-store"
-        assert (await client.get("/mcp")).status_code == 401
+        denied = await client.get("/mcp")
+        assert denied.status_code == 401
+        assert denied.headers["www-authenticate"] == (
+            'Bearer resource_metadata="https://fantasy.example.com/.well-known/oauth-protected-resource/mcp"'
+        )
         assert (await client.get("/.well-known/oauth-protected-resource")).status_code == 401
         assert (await client.post("/.well-known/oauth-protected-resource/mcp")).status_code == 401
