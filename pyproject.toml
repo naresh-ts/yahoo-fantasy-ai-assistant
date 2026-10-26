@@ -11,6 +11,7 @@ requires-python = ">=3.11"
 license = { file = "LICENSE" }
 dependencies = [
   "httpx>=0.28,<1",
+  "PyJWT[crypto]>=2.10,<3",
   "mcp>=2,<3",
   "pydantic-settings>=2.8,<3",
 ]
@@ -22,7 +23,7 @@ dev = [
 ]
 
 [tool.setuptools]
-py-modules = ["config", "server", "yahoo_client", "token_store", "token_manager", "remote_security"]
+py-modules = ["config", "server", "yahoo_client", "token_store", "token_manager", "remote_security", "oauth_verifier"]
 
 [tool.pytest.ini_options]
 pythonpath = ["."]
