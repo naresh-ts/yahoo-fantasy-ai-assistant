@@ -83,3 +83,15 @@ If a free VM cannot be provisioned, retain local-only access and reassess
 other free providers. Do not switch to an ephemeral free web service without
 a durable, private refresh-token store, and never expose an unauthenticated
 Codespace port. No provider account has been created.
+
+## OAuth verification implementation status
+
+The `oauth_verifier.py` module verifies RS256-signed JWTs against an
+explicit HTTPS JWKS endpoint, issuer, and resource audience. **It is not
+yet wired into an ASGI HTTP middleware or MCP authorization flow.**
+Remote access remains disabled by the local-only launcher. Before
+deployment, implement an OAuth-protected resource server with bearer
+token extraction, challenge and metadata endpoints, authorized-user
+policy, and end-to-end unauthenticated-request rejection tests. Do not
+treat the presence of a JWT verifier as proof that the endpoint is safe
+to expose.
