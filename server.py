@@ -77,10 +77,36 @@ def project_status() -> dict[str, Any]:
         "team_configured": bool(settings.yahoo_team_name),
         "available_tools": [
             "get_my_roster",
+            "get_league_settings",
+            "get_league_scoreboard",
             "get_available_players",
             "get_team_snapshot",
         ],
     }
+
+
+@mcp.tool()
+async def get_league_settings() -> dict[str, Any]:
+    """Return league roster and scoring rules for Waiver Full analysis."""
+    settings = _required_live_settings()
+    async with await _authorized_client(settings) as client:
+        league, _ = await _resolve_team(client, settings)
+        rules = await client.get_league_settings(league["league_key"])
+    return {"league": league, "settings": rules}
+
+
+@mcp.tool()
+async def get_league_scoreboard(week: int = 0) -> dict[str, Any]:
+    """Return league matchups for the current or a specified NFL week."""
+    if week and not 1 <= week <= 25:
+        raise ValueError("Week must be between 1 and 25")
+    settings = _required_live_settings()
+    async with await _authorized_client(settings) as client:
+        league, _ = await _resolve_team(client, settings)
+        scoreboard = await client.get_league_scoreboard(
+            league["league_key"], week=week or None
+        )
+    return {"league": league, "week": week or "current", "scoreboard": scoreboard}
 
 
 @mcp.tool()
