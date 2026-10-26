@@ -3,6 +3,7 @@
 import pytest
 
 from oauth_asgi_gate import OAuthASGIGate
+from oauth_discovery import OAuthResourceDiscovery
 from remote_transport import build_remote_mcp_app
 
 
@@ -34,8 +35,9 @@ class FakeMCP:
 def test_real_transport_is_wrapped_with_oauth():
     mcp = FakeMCP()
     app = build_remote_mcp_app(mcp, env())
-    assert isinstance(app, OAuthASGIGate)
-    assert app.app is mcp.app
+    assert isinstance(app, OAuthResourceDiscovery)
+    assert isinstance(app.app, OAuthASGIGate)
+    assert app.app.app is mcp.app
     assert mcp.kwargs["streamable_http_path"] == "/mcp"
     security = mcp.kwargs["transport_security"]
     assert security.enable_dns_rebinding_protection

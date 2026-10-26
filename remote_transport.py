@@ -4,6 +4,7 @@ from urllib.parse import urlparse
 
 from mcp.server.transport_security import TransportSecuritySettings
 
+from oauth_discovery import OAuthResourceDiscovery
 from remote_app import build_protected_app
 from remote_security import validate_remote_config
 
@@ -11,8 +12,8 @@ from remote_security import validate_remote_config
 def build_remote_mcp_app(mcp_server, environ=None):
     """Wrap the real MCP transport with OAuth and strict Host/Origin checks.
 
-    No public listener is created here. A separate reviewed deployment
-    launcher and OAuth discovery are still required.
+    No public listener is created here. A separate reviewed deployment launcher and a compatible OAuth
+    authorization server are still required.
     """
     import os
 
@@ -48,4 +49,5 @@ def build_remote_mcp_app(mcp_server, environ=None):
             allowed_origins=allowed_origins,
         ),
     )
-    return build_protected_app(transport, env)
+    protected = build_protected_app(transport, env)
+    return OAuthResourceDiscovery(protected, env["MCP_PUBLIC_URL"], env["MCP_OAUTH_ISSUER"])
