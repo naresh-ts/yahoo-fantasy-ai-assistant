@@ -23,4 +23,4 @@ jobs:
       - name: Run tests
         run: python -m pytest -q
       - name: Check startup script syntax
-        run: python -m py_compile start_server.py
+        run: python -m py_compile start_server.py start_remote_server.py
