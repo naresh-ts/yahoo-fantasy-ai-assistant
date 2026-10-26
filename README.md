@@ -4,10 +4,7 @@ A private, non-commercial integration designed to connect an authorized Yahoo Fa
 
 ## Project Status
 
-This project is currently in initial development. Access to the Yahoo Fantasy Sports API is pending approval.
-
-The safe project scaffold is now in place. Yahoo OAuth and league-data tools will
-be implemented after Yahoo provisions read-only API access.
+Yahoo API read-only access has been approved and the connector now supports authenticated league, roster, and available-player reads. The integration is **not yet deployed or connected to ChatGPT**. Remote MCP authentication and durable secret storage remain deployment requirements.
 
 ## Planned Features
 
@@ -53,7 +50,7 @@ Yahoo passwords, OAuth tokens, client secrets, league identifiers, and other pri
 Prerequisites:
 
 - Python 3.11 or newer
-- Yahoo API approval for live Yahoo requests (not required for the current tests)
+- Yahoo OAuth credentials for live requests (not required for unit tests)
 
 Create a virtual environment and install the project:
 
@@ -69,17 +66,19 @@ Run the tests:
 pytest
 ```
 
-Start the MCP server over Streamable HTTP:
+Start the MCP server over **local-only** Streamable HTTP:
 
 ```bash
-mcp run server.py --transport streamable-http
+python start_server.py
 ```
+
+The launcher refuses non-loopback binding. Do **not** expose the MCP endpoint publicly until remote client authentication, TLS, and durable private token storage are configured.
 
 The local MCP endpoint will be available at `http://localhost:8000/mcp`.
 
 ## Test Approved Yahoo Access
 
-After Yahoo approves and provisions the Developer application, run the private,
+To perform a private,
 interactive access test from a local terminal or GitHub Codespace:
 
 ```bash
@@ -94,7 +93,7 @@ memory and are not saved to disk.
 
 ## Configuration
 
-After Yahoo approves the application, copy `.env.example` to `.env` and enter the
+Copy `.env.example` to `.env` and enter the
 issued credentials locally. The `.env` file is ignored by Git and must never be
 committed.
 
@@ -102,8 +101,11 @@ committed.
 
 ```text
 config.py             # Environment-based configuration
-server.py             # MCP server and safe status tool
-yahoo_client.py       # Read-only Yahoo HTTP client foundation
+server.py             # Read-only MCP tools
+start_server.py       # Local-only HTTP MCP launcher
+yahoo_client.py       # Read-only Yahoo HTTP client
+token_manager.py      # Refresh and access token lifecycle
+token_store.py        # Private local refresh-token persistence
 test_*.py             # Initial automated tests
 .env.example          # Safe configuration template
 pyproject.toml        # Python dependencies and tooling
@@ -112,3 +114,7 @@ pyproject.toml        # Python dependencies and tooling
 ## Disclaimer
 
 This is an independent personal project and is not affiliated with, endorsed by, or sponsored by Yahoo or OpenAI.
+
+## Automated checks
+
+Pull requests run the Python test suite and check the MCP startup script's syntax through GitHub Actions. These tests use mock credentials and do not require Yahoo secrets. Passing CI does **not** establish that a remote deployment is authenticated or reachable.
