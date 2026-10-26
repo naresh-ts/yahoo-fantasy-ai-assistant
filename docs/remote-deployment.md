@@ -50,3 +50,20 @@ python deployment_preflight.py
 
 Do not run the live Yahoo API tests in GitHub Actions with production
 credentials unless a separate, restricted secrets policy is in place.
+
+## Selected hosting direction
+
+Use a **single-instance Render paid web service** with HTTPS, a persistent
+disk, and an established OAuth identity provider (for example Auth0) to
+authenticate ChatGPT clients. The current local-only launcher is deliberately
+not a Render web service yet. A public deployment must wait until OAuth
+resource protection is implemented and tested.
+
+Render's default filesystem is ephemeral. For a mounted persistent disk,
+configure `YAHOO_TOKEN_DIR` to a private directory inside that mount and
+limit access to the service process. Keep a single worker until rotating
+refresh-token coordination is implemented. Do not store a refresh token
+in the repository or bake it into a container image.
+
+**Cost:** Render paid compute, persistent disk, and any identity provider
+fees must be checked in the hosting dashboard before creating resources.
