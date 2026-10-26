@@ -95,3 +95,16 @@ token extraction, challenge and metadata endpoints, authorized-user
 policy, and end-to-end unauthenticated-request rejection tests. Do not
 treat the presence of a JWT verifier as proof that the endpoint is safe
 to expose.
+
+## HTTP authentication gate
+
+The `OAuthASGIGate` class enforces Bearer JWT verification and an
+explicit allowlisted OAuth subject before forwarding HTTP requests to an
+ASGI app. It denies missing, duplicate, malformed, expired, and
+wrong-user tokens (through the JWT verifier). This is a building block,
+**not yet an installed remote MCP transport**.
+
+A production-ready MCP OAuth integration still requires protected
+resource metadata, discovery/authorization compatibility with ChatGPT,
+the remote launcher, integration tests, and hardened HTTPS deployment.
+The local-only `start_server.py` remains unchanged.
