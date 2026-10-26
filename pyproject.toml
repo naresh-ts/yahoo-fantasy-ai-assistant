@@ -23,7 +23,7 @@ dev = [
 ]
 
 [tool.setuptools]
-py-modules = ["config", "server", "yahoo_client", "token_store", "token_manager", "remote_security", "oauth_verifier", "oauth_asgi_gate", "remote_app", "remote_transport"]
+py-modules = ["config", "server", "yahoo_client", "token_store", "token_manager", "remote_security", "oauth_verifier", "oauth_asgi_gate", "remote_app", "remote_transport", "oauth_discovery"]
 
 [tool.pytest.ini_options]
 pythonpath = ["."]
