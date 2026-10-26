@@ -108,3 +108,15 @@ A production-ready MCP OAuth integration still requires protected
 resource metadata, discovery/authorization compatibility with ChatGPT,
 the remote launcher, integration tests, and hardened HTTPS deployment.
 The local-only `start_server.py` remains unchanged.
+
+## Protected application composition
+
+`remote_app.build_protected_app(mcp_asgi_app)` now composes the security
+checks and OAuth request gate into an ASGI wrapper. The actual MCP HTTP
+transport application is still not passed into this factory by a remote
+launcher. **Do not run uvicorn against an unwrapped MCP application.**
+
+Before deployment: verify the installed MCP library's transport API,
+add a reviewed remote launcher, test unauthorized and authorized real
+MCP HTTP requests, implement OAuth protected-resource discovery and
+ChatGPT-compatible sign-in, and provision a secure $0 host.
