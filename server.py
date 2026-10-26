@@ -6,6 +6,7 @@ from mcp.server import MCPServer
 
 from config import Settings, get_settings
 from token_manager import YahooTokenManager
+from token_store import load_refresh_token
 from yahoo_client import YahooFantasyClient
 
 mcp = MCPServer("Yahoo Fantasy AI Assistant")
@@ -13,7 +14,12 @@ mcp = MCPServer("Yahoo Fantasy AI Assistant")
 
 def _required_live_settings() -> Settings:
     settings = get_settings()
-    if not settings.yahoo_live_access_configured:
+    if not (
+        settings.yahoo_credentials_configured
+        and settings.yahoo_league_id
+        and settings.yahoo_team_name
+        and (settings.yahoo_refresh_token or load_refresh_token())
+    ):
         raise RuntimeError(
             "Yahoo live access requires client credentials, refresh token, league ID, "
             "and team name."
@@ -49,15 +55,24 @@ def project_status() -> dict[str, Any]:
     """Report connector readiness without exposing secret values."""
 
     settings = get_settings()
+    refresh_token_configured = bool(
+        settings.yahoo_refresh_token or load_refresh_token()
+    )
+    live_access_configured = bool(
+        settings.yahoo_credentials_configured
+        and refresh_token_configured
+        and settings.yahoo_league_id
+        and settings.yahoo_team_name
+    )
     return {
         "status": (
             "live_access_configured"
-            if settings.yahoo_live_access_configured
+            if live_access_configured
             else "setup_incomplete"
         ),
         "read_only": True,
         "credentials_configured": settings.yahoo_credentials_configured,
-        "refresh_token_configured": bool(settings.yahoo_refresh_token),
+        "refresh_token_configured": refresh_token_configured,
         "league_configured": bool(settings.yahoo_league_id),
         "team_configured": bool(settings.yahoo_team_name),
         "available_tools": [
