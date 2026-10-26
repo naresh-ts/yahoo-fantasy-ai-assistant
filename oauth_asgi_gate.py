@@ -53,7 +53,8 @@ class OAuthASGIGate:
             await self._reject(send, 401)
             return
 
-        if token != token.strip() or len(token) > 16384:\n            await self._reject(send, 401)\n            return\n\n        try:\n            claims = self.verifier.verify(token)
+        if token != token.strip() or len(token) > 16384:
+            await self._reject(send, 401)\n            return\n\n        try:\n            claims = self.verifier.verify(token)
         except (PyJWTError, ValueError, OSError):
             await self._reject(send, 401)
             return
