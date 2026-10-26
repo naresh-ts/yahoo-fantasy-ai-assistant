@@ -3,6 +3,7 @@
 from mcp.server import MCPServer
 
 from oauth_asgi_gate import OAuthASGIGate
+from oauth_discovery import OAuthResourceDiscovery
 from remote_transport import build_remote_mcp_app
 
 
@@ -21,5 +22,6 @@ def test_real_mcp_sdk_transport_construction():
     }
     mcp = MCPServer("Integration Smoke Test")
     app = build_remote_mcp_app(mcp, settings)
-    assert isinstance(app, OAuthASGIGate)
+    assert isinstance(app, OAuthResourceDiscovery)
+    assert isinstance(app.app, OAuthASGIGate)
     assert callable(app.app)
