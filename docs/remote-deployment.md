@@ -67,3 +67,19 @@ in the repository or bake it into a container image.
 
 **Cost:** Render paid compute, persistent disk, and any identity provider
 fees must be checked in the hosting dashboard before creating resources.
+
+## Free-first hosting decision
+
+**Budget: $0; do not provision a paid Render service or persistent disk.**
+
+Evaluate an Oracle Cloud Always Free VM with its included persistent boot
+volume as a possible single-instance host. Availability, signup requirements,
+regional capacity, and free-tier eligibility must be checked before use.
+HTTPS, an authenticated MCP OAuth integration, secure private token storage,
+backups, and operating-system updates remain mandatory. A free VM is **not**
+a shortcut around authentication or operations.
+
+If a free VM cannot be provisioned, retain local-only access and reassess
+other free providers. Do not switch to an ephemeral free web service without
+a durable, private refresh-token store, and never expose an unauthenticated
+Codespace port. No provider account has been created.
