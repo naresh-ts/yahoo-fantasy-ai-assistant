@@ -5,7 +5,8 @@ from typing import Any
 from mcp.server import MCPServer
 
 from config import Settings, get_settings
-from yahoo_client import YahooFantasyClient, refresh_access_token
+from token_manager import YahooTokenManager
+from yahoo_client import YahooFantasyClient
 
 mcp = MCPServer("Yahoo Fantasy AI Assistant")
 
@@ -20,11 +21,16 @@ def _required_live_settings() -> Settings:
     return settings
 
 
+_token_manager: YahooTokenManager | None = None
+
+
 async def _authorized_client(settings: Settings) -> YahooFantasyClient:
-    assert settings.yahoo_refresh_token is not None
-    access_token = await refresh_access_token(
-        settings, settings.yahoo_refresh_token.get_secret_value()
-    )
+    global _token_manager
+
+    if _token_manager is None:
+        _token_manager = YahooTokenManager(settings)
+
+    access_token = await _token_manager.get_access_token()
     return YahooFantasyClient(settings, access_token)
 
 

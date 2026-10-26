@@ -234,3 +234,39 @@ class YahooFantasyClient:
 
     async def __aexit__(self, *_: object) -> None:
         await self.close()
+
+
+async def refresh_oauth_tokens(
+    settings: Settings, refresh_token: str
+) -> dict[str, Any]:
+    """Refresh Yahoo OAuth credentials and preserve replacement tokens."""
+
+    if not settings.yahoo_client_id or not settings.yahoo_client_secret:
+        raise ValueError("Yahoo client credentials are required")
+    if not refresh_token:
+        raise ValueError("A Yahoo refresh token is required")
+
+    async with httpx.AsyncClient(timeout=20.0) as client:
+        response = await client.post(
+            TOKEN_URL,
+            auth=(
+                settings.yahoo_client_id,
+                settings.yahoo_client_secret.get_secret_value(),
+            ),
+            data={
+                "grant_type": "refresh_token",
+                "refresh_token": refresh_token,
+            },
+        )
+        response.raise_for_status()
+        payload = response.json()
+
+    access_token = payload.get("access_token")
+    if not access_token:
+        raise RuntimeError("Yahoo did not return an access token")
+
+    return {
+        "access_token": access_token,
+        "refresh_token": payload.get("refresh_token") or refresh_token,
+        "expires_in": payload.get("expires_in", 3600),
+    }
