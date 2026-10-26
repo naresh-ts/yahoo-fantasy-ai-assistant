@@ -57,7 +57,7 @@ def test_authentication_gate(headers, expected):
 def test_websocket_rejected():
     calls, messages = asyncio.run(request(scope_type="websocket"))
     assert not calls
-    assert messages[0]["status"] == 403
+    assert messages[0] == {"type": "websocket.close", "code": 1008}
 
 
 def test_explicit_subject_required():
